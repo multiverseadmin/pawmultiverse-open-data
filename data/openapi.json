@@ -1,0 +1,306 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Paw Multiverse recall record",
+        "version": "1.0.0",
+        "summary": "Pet food recalls from four countries in one search, kept after the authority removes them.",
+        "description": "A free, read only record of pet food recalls read on a schedule from five official registers: US FDA animal and veterinary recalls, US FDA enforcement reports, the Canadian recalls and safety alerts register, the UK Food Standards Agency food alerts, and the French RappelConso. Every entry is dated the day it was read and kept after the authority stops listing it. /bag answers whether the barcode or lot code printed on a bag of pet food appears in a recall in any of those countries. No key, no sign up. Attribution required.",
+        "license": {
+            "name": "CC BY 4.0",
+            "identifier": "CC-BY-4.0",
+            "url": "https://creativecommons.org/licenses/by/4.0/"
+        },
+        "contact": {
+            "name": "Paw Multiverse",
+            "url": "https://pawmultiverse.com/contact/"
+        }
+    },
+    "servers": [
+        {
+            "url": "https://pawmultiverse.com/wp-json/mv/v1",
+            "description": "Live record"
+        }
+    ],
+    "paths": {
+        "/status": {
+            "get": {
+                "operationId": "getStatus",
+                "summary": "Totals for the record, and when each register was last read without error.",
+                "description": "Read this before quoting any figure. last_read_ok is the freshness of a register; cadence_min is how often it is read.",
+                "responses": {
+                    "200": {
+                        "description": "Record status"
+                    }
+                }
+            }
+        },
+        "/sources": {
+            "get": {
+                "operationId": "listSources",
+                "summary": "The registers read, and the licence each is used under.",
+                "responses": {
+                    "200": {
+                        "description": "Register list"
+                    }
+                }
+            }
+        },
+        "/records": {
+            "get": {
+                "operationId": "listRecords",
+                "summary": "Every recall held, newest first.",
+                "parameters": [
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 200
+                        },
+                        "description": "Items per page. The default is smaller than the record, so page or raise it."
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Restrict to one register slug, from /sources."
+                    },
+                    {
+                        "name": "jurisdiction",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Restrict to one country, ISO 3166-1 alpha-2, for example FR."
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "listed, or removed for entries the authority no longer lists and this record still holds."
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Free text, matched case-insensitively against the record title and id."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Records",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer",
+                                            "description": "Total held, which can exceed the items returned."
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "description": "Register slug and the register own key."
+                                                    },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "url": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    },
+                                                    "source": {
+                                                        "type": "string",
+                                                        "description": "Register slug, for example fr-rappelconso-animal."
+                                                    },
+                                                    "jurisdiction": {
+                                                        "type": "string",
+                                                        "description": "ISO 3166-1 alpha-2 country code."
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "description": "listed, or removed when the authority no longer lists it. We keep it either way."
+                                                    },
+                                                    "changes": {
+                                                        "type": "integer",
+                                                        "description": "How many dated versions of this entry are held."
+                                                    },
+                                                    "last_seen": {
+                                                        "type": "string",
+                                                        "description": "When this entry last changed in the register, UTC. Not the register read time: see /status."
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/records/{source}/{key}": {
+            "get": {
+                "operationId": "getRecord",
+                "summary": "One recall, with every dated version held.",
+                "parameters": [
+                    {
+                        "name": "source",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "on",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "description": "Return the version as it stood on this date."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Record"
+                    }
+                }
+            }
+        },
+        "/changes": {
+            "get": {
+                "operationId": "listChanges",
+                "summary": "Every change detected: additions, rewrites and removals, newest first.",
+                "responses": {
+                    "200": {
+                        "description": "Changes"
+                    }
+                }
+            }
+        },
+        "/changes/{id}": {
+            "get": {
+                "operationId": "getChange",
+                "summary": "One change, citable at its own permanent address.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Change"
+                    }
+                }
+            }
+        },
+        "/verify": {
+            "get": {
+                "operationId": "verifyRecord",
+                "summary": "Confirm that a stated version of a record is the one this archive holds.",
+                "parameters": [
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "on",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Verification"
+                    }
+                }
+            }
+        },
+        "/bag": {
+            "get": {
+                "operationId": "checkBag",
+                "summary": "Is the barcode or lot code on this bag in a recall, in any of four countries.",
+                "description": "Give it the number printed on the packaging. It normalises barcodes to GTIN-14, recognises lot codes and best before dates, and searches France, the United Kingdom, the United States and Canada at once. The coverage block says, per country, how many held recalls publish a barcode or a lot code at all, so a no match can be reported honestly rather than as not recalled.",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "00087535400604"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Match result"
+                    }
+                }
+            }
+        },
+        "/bag/cross-border": {
+            "get": {
+                "operationId": "listCrossBorder",
+                "summary": "The same product recalled in more than one country, matched on barcode.",
+                "description": "Published nowhere else. Each pair is two or more recall notices from different national registers carrying the same barcode.",
+                "responses": {
+                    "200": {
+                        "description": "Pairs"
+                    }
+                }
+            }
+        }
+    }
+}
