@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this record, please cite it as below."
+title: "PawMultiverse pet food recall record"
+abstract: >-
+  A cross-border record of pet food recalls, built by reading five official government
+  registers on a schedule and keeping every entry after the publishing authority takes
+  it down. Covers France (RappelConso), the United States (FDA animal and veterinary
+  recalls, and pet food enforcement reports), the United Kingdom (Food Standards Agency)
+  and Canada. Matches products across registers on barcode, so the same product recalled
+  in more than one country can be seen in one place, and keeps every dated version of a
+  notice so changes an authority made after publishing remain visible.
+type: dataset
+authors:
+  - name: "A.I.T. Multiverse Consulting Ltd"
+    city: Nicosia
+    country: CY
+    website: "https://aitmultiverse.com/"
+url: "https://pawmultiverse.com/pet-food-recalls/"
+repository-code: "https://github.com/multiverseadmin/pawmultiverse-open-data"
+license: CC-BY-4.0
+keywords:
+  - pet food
+  - product recall
+  - food safety
+  - open data
+  - cross-border
+  - RappelConso
+  - FDA
+  - Food Standards Agency
+  - CFIA
