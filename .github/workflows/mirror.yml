@@ -1,0 +1,103 @@
+name: Mirror the PawMultiverse recall record
+
+# Runs every night at 04:20 UTC and on demand. Downloads every public dataset the
+# site publishes into a staging folder first, checks each one parses as JSON and
+# that the record is not empty, and only then copies it over data/. A commit is
+# made only when something actually changed. Partial or empty data is never
+# committed, so a bad night leaves yesterday's mirror standing.
+
+on:
+  schedule:
+    - cron: "20 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE: https://pawmultiverse.com
+      UA: pm-open-data-mirror (GitHub Actions; +https://github.com/multiverseadmin/pawmultiverse-open-data)
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download everything into a staging folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          STAGE="$(mktemp -d)"
+          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+
+          fetch () {
+            curl -fsSL --retry 3 --retry-delay 5 --retry-all-errors \
+              --max-time 120 --user-agent "$UA" --output "$2" "$1"
+            [ -s "$2" ] || { echo "Empty download: $1" >&2; exit 1; }
+            jq -e . "$2" > /dev/null || { echo "Not valid JSON: $1" >&2; exit 1; }
+            echo "ok  $1"
+          }
+
+          fetch "$BASE/wp-json/mv/v1/status"                "$STAGE/status.json"
+          fetch "$BASE/wp-json/mv/v1/sources"               "$STAGE/sources.json"
+          fetch "$BASE/wp-json/mv/v1/records?per_page=1000" "$STAGE/records.json"
+          fetch "$BASE/wp-json/mv/v1/bag/cross-border"      "$STAGE/cross-border.json"
+          fetch "$BASE/wp-json/mv/v1/changes"               "$STAGE/changes.json"
+          fetch "$BASE/openapi.json"                        "$STAGE/openapi.json"
+
+          COUNT="$(jq -r '.count // 0' "$STAGE/records.json")"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "The record returned $COUNT entries. Stopping without changes." >&2
+            exit 1
+          fi
+          echo "The record holds $COUNT entries."
+
+      - name: Flatten the record into a CSV
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -r '
+            ["id","title","source","jurisdiction","status","changes","last_seen","url"],
+            (.items[]? | [
+              .id, .title, .source, .jurisdiction, .status,
+              ((.changes // 0) | tostring), .last_seen, .url
+            ])
+            | @csv
+          ' "$STAGE/records.json" > "$STAGE/records.csv"
+
+          LINES="$(wc -l < "$STAGE/records.csv")"
+          if [ "$LINES" -lt 2 ]; then
+            echo "The CSV came out empty. Stopping without changes." >&2
+            exit 1
+          fi
+
+      - name: Put the staging folder in place
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          cp "$STAGE"/*.json "$STAGE"/records.csv data/
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > data/LAST_MIRRORED.txt
+
+      - name: Commit only if something changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name  "pawmultiverse mirror"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "Nothing changed tonight."
+            exit 0
+          fi
+          git commit -m "Mirror the record, $(date -u +%Y-%m-%d)"
+          git push
